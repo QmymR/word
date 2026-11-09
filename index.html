@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一念初生 · 甬上四季</title>
+<link rel="stylesheet" href="style.css">
+<!-- 静态预取手势库：入口路径与 app.js 里 CONFIG.mp.bundle 必须一致 -->
+<link rel="modulepreload" href="./vendor/mediapipe/vision_bundle.mjs">
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <!-- 左下：标题与朱砂印（画面里唯一的“大字”） -->
+  <div id="titleBlock">
+    <h1>甬上四季</h1>
+  </div>
+
+  <!-- 右侧竖排题跋：花名、季节、花语、小印 -->
+  <aside id="inscription" aria-hidden="true">
+    <div class="insc-quote">
+      <div id="flowerQuote">岁寒先发，一枝报春</div>
+      <div class="seal seal-small"><span>甬</span></div>
+    </div>
+    <div class="insc-name">
+      <span id="flowerSeason" class="season">春</span>
+      <span id="flowerNameZh">茶花</span>
+    </div>
+  </aside>
+
+  <!-- 右下：只留一个音符，鼠标靠近才露字 -->
+  <div id="soundCtl">
+    <button id="soundBtn" type="button" aria-label="静音 / 停止声音" title="静音 / 停止声音（M）">
+      <span id="muteGlyph">♪</span>
+      <span class="sound-label">静音 · 停止声音</span>
+    </button>
+  </div>
+
+  <!-- 右下：一枚很小的回看窗，帮助对位，不是 HUD -->
+  <div id="camWrap">
+    <video id="cam" autoplay playsinline muted></video>
+    <canvas id="skel" width="240" height="180"></canvas>
+    <div id="handTags">
+      <span id="tagLeft" class="hand-tag">左手</span>
+      <span id="tagRight" class="hand-tag">右手</span>
+    </div>
+  </div>
+
+  <!-- 短暂提示：数秒后自己消失，不常驻 -->
+  <div id="toast" aria-live="polite"></div>
+
+  <!-- 加载诊断：只在出错时出现 -->
+  <div id="errDetail" class="hidden" aria-live="polite"></div>
+
+  <!-- 进入页：操作说明只在这里讲一次 -->
+  <div id="gate">
+    <!-- 四季动物装饰：手绘 SVG，四角分布 -->
+    <div class="gate-animals" aria-hidden="true">
+      <!-- 春蝶（左上） -->
+      <div class="gate-animal ga-spring">
+        <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="rgba(146,86,74,0.55)" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
+            <!-- 前翅 -->
+            <path d="M48 40 C 30 10, 5 15, 2 35 C 0 48, 20 45, 48 40 Z" fill="rgba(248,204,188,0.88)"/>
+            <!-- 后翅 -->
+            <path d="M48 40 C 32 55, 10 62, 15 72 C 22 78, 38 60, 48 40 Z" fill="rgba(220,152,132,0.85)"/>
+            <!-- 另一侧镜像前翅 -->
+            <path d="M52 40 C 70 10, 95 15, 98 35 C 100 48, 80 45, 52 40 Z" fill="rgba(248,204,188,0.88)"/>
+            <!-- 另一侧镜像后翅 -->
+            <path d="M52 40 C 68 55, 90 62, 85 72 C 78 78, 62 60, 52 40 Z" fill="rgba(220,152,132,0.85)"/>
+            <!-- 翅脉 -->
+            <g stroke="rgba(146,86,74,0.30)" stroke-width="0.7">
+              <path d="M48 40 L 20 22"/>
+              <path d="M48 40 L 15 32"/>
+              <path d="M48 40 L 25 55"/>
+              <path d="M52 40 L 80 22"/>
+              <path d="M52 40 L 85 32"/>
+              <path d="M52 40 L 75 55"/>
+            </g>
+            <!-- 后翅斑点 -->
+            <circle cx="25" cy="60" r="1.8" fill="rgba(108,48,42,0.55)" stroke="none"/>
+            <circle cx="75" cy="60" r="1.8" fill="rgba(108,48,42,0.55)" stroke="none"/>
+            <!-- 身体 -->
+            <line x1="50" y1="30" x2="50" y2="62" stroke="rgba(86,42,34,0.85)" stroke-width="2.2"/>
+            <!-- 头 -->
+            <circle cx="50" cy="28" r="3.2" fill="rgba(86,42,34,0.85)" stroke="none"/>
+            <!-- 触角 -->
+            <path d="M49 26 C 46 18, 43 14, 40 12" stroke="rgba(86,42,34,0.75)" stroke-width="1.0" fill="none"/>
+            <path d="M51 26 C 54 18, 57 14, 60 12" stroke="rgba(86,42,34,0.75)" stroke-width="1.0" fill="none"/>
+            <circle cx="40" cy="12" r="1.2" fill="rgba(86,42,34,0.75)" stroke="none"/>
+            <circle cx="60" cy="12" r="1.2" fill="rgba(86,42,34,0.75)" stroke="none"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- 夏鱼（右上） -->
+      <div class="gate-animal ga-summer">
+        <svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="rgba(52,88,76,0.50)" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" fill="none">
+            <!-- 尾 -->
+            <path d="M20 30 L 2 12 L 10 30 L 2 48 Z" fill="rgba(170,206,192,0.58)"/>
+            <!-- 身体 -->
+            <path d="M20 30 C 30 12, 70 10, 95 22 C 110 28, 112 32, 115 30 C 112 34, 110 34, 95 38 C 70 48, 30 48, 20 30 Z" fill="rgba(176,212,196,0.88)"/>
+            <!-- 鳃 -->
+            <path d="M90 22 C 88 30, 88 34, 90 38" stroke="rgba(52,88,76,0.35)" stroke-width="1.0" fill="none"/>
+            <!-- 眼 -->
+            <circle cx="103" cy="28" r="3.5" fill="rgba(246,249,244,0.95)" stroke="rgba(52,88,76,0.45)" stroke-width="1.0"/>
+            <circle cx="104" cy="28" r="1.8" fill="rgba(52,84,74,0.92)" stroke="none"/>
+            <!-- 嘴 -->
+            <path d="M112 30 C 110 32, 108 32, 107 30" stroke="rgba(52,88,76,0.40)" stroke-width="1.0" fill="none"/>
+            <!-- 背鳍 -->
+            <path d="M50 12 C 60 2, 75 6, 78 14" stroke="rgba(52,88,76,0.30)" stroke-width="1.0" fill="rgba(168,206,190,0.42)"/>
+            <!-- 腹鳍 -->
+            <path d="M55 48 C 62 56, 72 54, 74 48" stroke="rgba(52,88,76,0.30)" stroke-width="1.0" fill="rgba(168,206,190,0.38)"/>
+            <!-- 鳞纹 -->
+            <g stroke="rgba(52,88,76,0.16)" stroke-width="0.7" fill="none">
+              <path d="M35 22 C 38 26, 38 34, 35 38"/>
+              <path d="M48 20 C 52 26, 52 34, 48 40"/>
+              <path d="M62 20 C 66 26, 66 34, 62 40"/>
+              <path d="M76 22 C 80 28, 80 32, 76 38"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <!-- 秋雀（右下） -->
+      <div class="gate-animal ga-autumn">
+        <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="rgba(112,76,30,0.55)" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
+            <!-- 尾 -->
+            <path d="M30 36 L 8 30 L 8 42 L 30 40" fill="rgba(168,124,64,0.88)"/>
+            <!-- 身体 -->
+            <path d="M28 38 C 32 16, 72 14, 85 32 C 92 40, 88 54, 70 58 C 46 62, 28 54, 28 38 Z" fill="rgba(160,116,60,0.88)"/>
+            <!-- 胸腹浅 -->
+            <ellipse cx="60" cy="46" rx="18" ry="10" fill="rgba(244,220,172,0.72)" stroke="none"/>
+            <!-- 翅膀 -->
+            <path d="M44 28 C 50 14, 72 14, 76 26 C 74 32, 60 34, 46 32 Z" fill="rgba(130,90,40,0.85)"/>
+            <!-- 头顶黑斑 -->
+            <ellipse cx="80" cy="26" rx="6" ry="5" fill="rgba(68,44,14,0.55)" stroke="none"/>
+            <!-- 喙 -->
+            <path d="M92 32 L 100 34 L 92 36 Z" fill="rgba(196,140,44,0.92)"/>
+            <!-- 眼 -->
+            <circle cx="88" cy="30" r="2.2" fill="rgba(250,240,222,0.95)" stroke="rgba(88,56,18,0.55)" stroke-width="0.8"/>
+            <circle cx="88.5" cy="30" r="1.2" fill="rgba(48,28,8,0.92)" stroke="none"/>
+            <!-- 腿 -->
+            <line x1="50" y1="58" x2="48" y2="70" stroke="rgba(148,102,34,0.85)" stroke-width="1.3"/>
+            <line x1="58" y1="58" x2="60" y2="70" stroke="rgba(148,102,34,0.85)" stroke-width="1.3"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- 冬鹤（左下） -->
+      <div class="gate-animal ga-winter">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="rgba(86,108,132,0.50)" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
+            <!-- 腿 -->
+            <line x1="42" y1="68" x2="40" y2="96" stroke="rgba(100,74,52,0.90)" stroke-width="1.4"/>
+            <line x1="50" y1="68" x2="52" y2="96" stroke="rgba(100,74,52,0.90)" stroke-width="1.4"/>
+            <!-- 身体 -->
+            <ellipse cx="48" cy="52" rx="22" ry="13" fill="rgba(230,238,244,0.95)"/>
+            <!-- 翅膀（收束） -->
+            <path d="M32 50 C 40 38, 62 38, 72 50 C 68 56, 54 54, 32 50 Z" fill="rgba(212,224,236,0.90)"/>
+            <!-- 飞羽尖端黑 -->
+            <path d="M44 42 C 56 40, 70 44, 72 50 C 68 54, 56 50, 44 42 Z" fill="rgba(50,68,90,0.85)"/>
+            <!-- 脖子 S 形（粗描边模拟） -->
+            <path d="M60 46 C 70 38, 76 22, 72 14" stroke="rgba(248,250,252,0.96)" stroke-width="6" stroke-linecap="round" fill="none"/>
+            <!-- 脖子外描边 -->
+            <path d="M60 46 C 70 38, 76 22, 72 14" stroke="rgba(86,108,132,0.45)" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+            <!-- 头 -->
+            <circle cx="72" cy="12" r="5" fill="rgba(216,226,236,0.92)"/>
+            <!-- 红冠 -->
+            <circle cx="72" cy="9" r="3.4" fill="rgba(196,50,58,0.95)" stroke="rgba(148,30,38,0.60)" stroke-width="0.6"/>
+            <!-- 喙 -->
+            <path d="M77 13 L 90 14 L 77 16 Z" fill="rgba(220,180,120,0.92)"/>
+            <!-- 眼 -->
+            <circle cx="73" cy="10.5" r="1.3" fill="rgba(20,28,40,0.95)"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="gate-panel">
+      <div class="gate-logo" title="甬上四季"><span>甬上<br>四季</span></div>
+      <h2>一念初生，四季化形</h2>
+
+      <!-- 手势示意：水墨线描，左右手 -->
+      <div class="gate-gestures" aria-hidden="true">
+        <!-- 右手：张合控制 -->
+        <div class="gg gg-right">
+          <svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ggR" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0"  stop-color="rgba(201,107,123,0.18)"/>
+                <stop offset="1"  stop-color="rgba(201,107,123,0.04)"/>
+              </linearGradient>
+            </defs>
+            <!-- 手本体（张开形态） -->
+            <g fill="url(#ggR)" stroke="#9e3b2c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+              <!-- 手腕 -->
+              <path d="M74 82 C 70 78, 66 74, 64 70 L 58 72 C 60 78, 66 84, 74 86 Z"/>
+              <!-- 手掌 / 拇指 -->
+              <path d="M64 70 C 54 62, 48 50, 46 40 C 46 34, 50 32, 54 34 C 56 42, 60 48, 66 52 C 62 40, 60 28, 62 18 C 63 12, 68 12, 69 18 C 70 28, 72 38, 74 46 C 76 38, 78 28, 82 18 C 84 12, 90 12, 90 20 C 90 30, 88 40, 86 48 C 88 42, 92 32, 98 24 C 100 18, 108 20, 106 28 C 102 38, 96 48, 94 56 C 98 48, 106 38, 116 36 C 122 36, 126 42, 120 48 C 110 54, 102 56, 96 58 C 102 64, 112 72, 118 74 C 122 76, 122 82, 118 84 C 108 86, 92 86, 74 82 Z"/>
+              <!-- 指尖关节短线 -->
+              <path d="M54 36 L 56 44"/>
+              <path d="M67 20 L 68 28"/>
+              <path d="M84 20 L 86 28"/>
+              <path d="M104 26 L 100 34"/>
+            </g>
+            <!-- 张合箭头：上下弧线 -->
+            <g fill="none" stroke="#9e3b2c" stroke-width="1.3" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.70">
+              <path d="M22 16 C 40 8, 70 4, 110 6"/>
+              <path d="M22 74 C 40 82, 70 86, 110 84"/>
+            </g>
+            <g fill="#9e3b2c" opacity="0.70">
+              <path d="M110 6 L 106 2 L 108 8 Z"/>
+              <path d="M110 84 L 108 88 L 106 82 Z"/>
+            </g>
+          </svg>
+          <div class="gg-label">右手 · 张合化形</div>
+        </div>
+
+        <!-- 左手：向外一挥换季 -->
+        <div class="gg gg-left">
+          <svg viewBox="0 0 170 90" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ggL" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0"  stop-color="rgba(201,107,123,0.04)"/>
+                <stop offset="1"  stop-color="rgba(201,107,123,0.18)"/>
+              </linearGradient>
+            </defs>
+            <!-- 手：向左伸出（预备姿态） -->
+            <g fill="url(#ggL)" stroke="#9e3b2c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+              <!-- 手腕 -->
+              <path d="M96 44 C 96 52, 94 60, 90 66 L 84 68 C 86 60, 90 52, 92 44 Z"/>
+              <!-- 手掌与五指（平伸） -->
+              <path d="M90 44 C 80 42, 62 38, 38 36 C 32 36, 28 40, 30 44 C 40 46, 54 48, 66 48 C 54 50, 40 54, 32 60 C 30 64, 34 68, 38 66 C 48 62, 60 58, 72 56 C 64 62, 54 72, 46 80 C 42 84, 46 90, 52 88 C 62 82, 72 72, 80 62 C 74 68, 70 76, 68 84 C 66 90, 72 92, 76 88 C 82 80, 86 70, 90 62 C 92 54, 94 48, 96 44 Z"/>
+              <path d="M64 42 L 64 46"/>
+              <path d="M52 40 L 52 44"/>
+              <path d="M42 38 L 42 42"/>
+            </g>
+            <!-- 挥动轨迹：从手掌出发向右弧形 -->
+            <g fill="none" stroke="#9e3b2c" stroke-width="1.3" stroke-dasharray="5 3" stroke-linecap="round" opacity="0.72">
+              <path d="M98 44 C 118 30, 140 20, 160 22"/>
+            </g>
+            <g fill="#9e3b2c" opacity="0.78">
+              <path d="M160 22 L 154 18 L 156 26 Z"/>
+            </g>
+            <!-- "换季"小圆点 -->
+            <g fill="#9e3b2c" opacity="0.55">
+              <circle cx="110" cy="30" r="1.8"/>
+              <circle cx="130" cy="24" r="1.6"/>
+              <circle cx="150" cy="22" r="1.4"/>
+            </g>
+          </svg>
+          <div class="gg-label">左手 · 挥臂换季</div>
+        </div>
+      </div>
+
+      <p class="gate-guide">无摄像头也能完整体验：按住空格，或上下拖动鼠标。</p>
+      <button id="startBtn" type="button">进 入</button>
+      <p class="gate-note">M 静音 · C 摄像头 · D 演示模式 · Esc 退出</p>
+    </div>
+  </div>
+
+  <!-- 开场揭幕：一张纸褪去（约 1.2s） -->
+  <div id="reveal" class="hidden" aria-hidden="true">
+    <div class="reveal-veil"></div>
+  </div>
+
+  <!-- 演示模式切换时的纸色过渡：避免大屏切换露出桌面 -->
+  <div id="blackout" aria-hidden="true"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

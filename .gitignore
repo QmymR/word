@@ -1,0 +1,6 @@
+# 已被程序化绘制的四季动画取代，无需上传（约 50MB）
+assets/seq_norm/
+# macOS 垃圾文件
+assets/.DS_Store
+# 演示视频，不参与运行
+甬上四季_作品效果.mp4
