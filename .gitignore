@@ -2,5 +2,7 @@
 assets/seq_norm/
 # macOS 垃圾文件
 assets/.DS_Store
+# 0 字节占位说明文件，暂不纳入版本库
+请双击启动bat自启动浏览器游玩.txt
 # 演示视频，不参与运行
 甬上四季_作品效果.mp4
